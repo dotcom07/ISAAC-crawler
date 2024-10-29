@@ -10,8 +10,11 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 class Fetcher:
-    def __init__(self, user_agents, logger):
-        self.USER_AGENTS = user_agents
+    def __init__(self, user_agents=None, logger=None):
+        # 기본 User-Agent를 설정
+        self.USER_AGENTS = user_agents or [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        ]
         self.logger = logger
 
     def fetch_page_content(self, session, url, retries=10, backoff_factor=2, max_backoff=100, initial_timeout=30, max_total_timeout=200):

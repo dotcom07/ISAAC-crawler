@@ -39,8 +39,8 @@ class Crawler:
         self.parsed_set = set()
         self.parsed_set_lock = threading.Lock()  # parsed_set 접근을 위한 Lock
 
-        # 링크 파일 설정
-        self.links_file = 'links.jsonl'
+        # 링크 파일 설정 
+        self.links_file = os.path.join('crawler_state', 'links.jsonl')
         self.links_lock = threading.Lock()  # 파일 쓰기 동기화를 위한 락
 
         # Fetcher 객체 초기화

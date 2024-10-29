@@ -3,7 +3,7 @@ import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 import urllib3
-
+import os
 from crawler import Crawler
 
 # 로깅 설정
@@ -11,7 +11,8 @@ logger = logging.getLogger('CrawlerLogger')
 logger.setLevel(logging.INFO)  # 로깅 레벨을 INFO로 변경하여 정보 메시지 표시
 
 # RotatingFileHandler 설정 (5MB마다 로그 파일을 교체, 최대 5개 파일 유지, UTF-8 인코딩)
-file_handler = RotatingFileHandler("crawler.log", maxBytes=5*1024*1024, backupCount=5, encoding='utf-8')
+log_file =  os.path.join('log', 'crawler.log')
+file_handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=5, encoding='utf-8')
 file_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
@@ -40,8 +41,8 @@ def main():
     save_interval = args.save_interval
 
     # 파일 경로 설정
-    original_file = 'original_data.jsonl'  # 원본 데이터를 저장할 JSONL 파일
-    state_file = 'crawler_state.json'
+    original_file =  os.path.join('original_data', 'original_data.jsonl')
+    state_file = os.path.join('crawler_state', 'crawler_state.json')
 
     # 크롤러 인스턴스 생성
     crawler = Crawler(
