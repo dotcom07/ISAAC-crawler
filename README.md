@@ -21,7 +21,7 @@ https://library.yonsei.ac.kr/bbs/list/1 - 로그인을 안 하면 못 보는 사
 python -m announcement_crawler.main_for_announcement
 
 진행중 
-https://dorm.yonsei.ac.kr/
+https://dorm.yonsei.ac.kr/ https://yicrc.yonsei.ac.kr/ (준혁)
 
 완료 
 https://computing.yonsei.ac.kr/
