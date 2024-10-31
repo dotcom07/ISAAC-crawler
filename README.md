@@ -13,6 +13,8 @@ https://rc.yonsei.ac.kr/
 https://yicdorm.yonsei.ac.kr/
 https://dorm.yonsei.ac.kr/
 
+
+
 완료 
 https://computing.yonsei.ac.kr/
 https://ysb.yonsei.ac.kr/
