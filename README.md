@@ -20,9 +20,10 @@ python -m announcement_crawler.main_for_announcement
 
 진행중 
  https://yicrc.yonsei.ac.kr/ (준혁)
- https://rc.yonsei.ac.kr/
+
 
 완료 
 https://computing.yonsei.ac.kr/
 https://ysb.yonsei.ac.kr/
 https://dorm.yonsei.ac.kr/
+https://rc.yonsei.ac.kr/
