@@ -8,10 +8,12 @@ from crawler import Crawler
 
 # 로깅 설정
 logger = logging.getLogger('CrawlerLogger')
-logger.setLevel(logging.INFO)  # 로깅 레벨을 INFO로 변경하여 정보 메시지 표시
+logger.setLevel(logging.INFO)  # DEBUG 레벨로 설정하여 추가 로그 확인
 
 # RotatingFileHandler 설정 (5MB마다 로그 파일을 교체, 최대 5개 파일 유지, UTF-8 인코딩)
-log_file =  os.path.join('log', 'crawler.log')
+log_dir = 'log'
+os.makedirs(log_dir, exist_ok=True)
+log_file =  os.path.join(log_dir, 'crawler.log')
 file_handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=5, encoding='utf-8')
 file_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 file_handler.setFormatter(file_formatter)
@@ -41,8 +43,12 @@ def main():
     save_interval = args.save_interval
 
     # 파일 경로 설정
-    original_file =  os.path.join('original_data', 'original_data.jsonl')
-    state_file = os.path.join('crawler_state', 'crawler_state.json')
+    original_dir = 'original_data'
+    os.makedirs(original_dir, exist_ok=True)
+    original_file =  os.path.join(original_dir, 'original_data.jsonl')
+    state_dir = 'crawler_state'
+    os.makedirs(state_dir, exist_ok=True)
+    state_file = os.path.join(state_dir, 'crawler_state.json')
 
     # 크롤러 인스턴스 생성
     crawler = Crawler(

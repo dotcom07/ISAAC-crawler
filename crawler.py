@@ -9,7 +9,8 @@ import logging
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-
+import hashlib
+import re
 from fetcher import Fetcher
 from parser import Parser
 from saver import Saver
@@ -26,10 +27,12 @@ class Crawler:
         self.save_interval = save_interval
         self.user_agents = user_agents
         self.logger = logger
+
         # 시작 URL의 netloc을 추출하여 base_domain으로 설정
         parsed_start_url = urlparse(start_url)
         self.base_domain = parsed_start_url.netloc.lower()
 
+        # 큐 및 집합 초기화
         self.fetch_queue = deque()
         self.fetch_queue_lock = threading.Lock()  # fetch_queue 접근을 위한 Lock
         self.parse_queue = deque()
@@ -38,6 +41,10 @@ class Crawler:
         self.visited_lock = threading.Lock()  # visited 접근을 위한 Lock
         self.parsed_set = set()
         self.parsed_set_lock = threading.Lock()  # parsed_set 접근을 위한 Lock
+
+        # 중복된 merged_text를 추적하기 위한 집합과 락 추가
+        self.seen_texts = set()
+        self.seen_texts_lock = threading.Lock()
 
         # 링크 파일 설정 
         self.links_file = os.path.join('crawler_state', 'links.jsonl')
@@ -54,15 +61,17 @@ class Crawler:
 
         # StateManager 객체 초기화
         self.state_manager = StateManager(state_file, self.logger)
-        # 상태 로드
-        self.fetch_queue, self.parse_queue, self.visited, self.parsed_set = self.state_manager.load_state(self.start_url)
+
+        # 상태 로드 (seen_texts 포함)
+        state = self.state_manager.load_state(self.start_url)
+        self.fetch_queue, self.parse_queue, self.visited, self.parsed_set, self.seen_texts = state
 
         self.stop_crawling_event = threading.Event()
 
         # 이미 제외된 URL을 저장하는 캐시 추가
         self.excluded_cache = set()
 
-    # 제외할 경로 패턴 정의
+        # 제외할 경로 패턴 정의
         self.excluded_paths = [
             '/wj/',
             '/en_sc/',
@@ -74,7 +83,7 @@ class Crawler:
             '/en_sc',
             '/en_wj/',
             '/ocx',
-            '/ocx_en',
+            '/ocx_en/',
             '/cn_wj'
         ]
         
@@ -93,8 +102,17 @@ class Crawler:
             'https://computing.yonsei.ac.kr/eng',
             'https://library.yonsei.ac.kr/en',
             'https://library.yonsei.ac.kr/SSOLegacy.do',
-            'https://library.yonsei.ac.kr/login'
+            'https://library.yonsei.ac.kr/login',
+            'https://www.yonsei.ac.kr/sc/intro/promotionvideo.jsp',
+            'https://www.yonsei.ac.kr/sc/intro/promotionvideo-for-sns.jsp',
+            'https://www.yonsei.ac.kr/sc/intro/pressrel.jsp',
+            'https://www.yonsei.ac.kr/sc/intro/media1.jsp',
+            'https://oia.yonsei.ac.kr/news/newsInt.asp?SFIELD=>XT=>XT=>XT=>XT',
+            'https://oia.yonsei.ac.kr/intstd/notice.asp?SFIELD=>XT=>XT=>XT=>XT',
+            'https://oia.yonsei.ac.kr/news/newsIMain.asp?SFIELD=>XT=>XT=>XT=>XT',
+            'https://oia.yonsei.ac.kr/intro/photo.asp'
         ]
+
 
     def is_excluded(self, url):
         """
@@ -132,6 +150,7 @@ class Crawler:
                     # 중복이 아니면 fetch_queue에 추가
                     with self.fetch_queue_lock:
                         self.fetch_queue.append((normalized_url, depth))
+                        self.logger.debug(f"URL 큐에 추가됨: {normalized_url} (Depth: {depth})")  # 추가된 로그
                     self.visited.add(normalized_url)
                     
                     # links.jsonl에 추가
@@ -161,6 +180,7 @@ class Crawler:
                         if self.max_depth is None or depth <= self.max_depth:
                             with self.fetch_queue_lock:
                                 self.fetch_queue.append((url, depth))
+                                self.logger.debug(f"URL 큐에 추가됨: {url} (Depth: {depth})")  # 추가된 로그
                             self.visited.add(url)
                             added_count += 1
             self.logger.info(f"links.jsonl에서 {added_count}개의 URL을 큐에 추가했습니다.")
@@ -220,6 +240,15 @@ class Crawler:
                     # 크롤링 실패 시 로깅
                     self.logger.warning(f"[{thread_name}] 크롤링 실패: {url}")
 
+    def normalize_text(self, text):
+        # 모든 공백을 단일 공백으로 변환하고 양쪽 공백 제거
+        text = re.sub(r'\s+', ' ', text).strip()
+        # 소문자 변환
+        text = text.lower()
+        # 불필요한 특수 문자 제거 (필요에 따라 조정)
+        text = re.sub(r'[^\w\s]', '', text)
+        return text
+
     def parse_worker(self):
         thread_name = threading.current_thread().name
         while not self.stop_crawling_event.is_set():
@@ -238,6 +267,29 @@ class Crawler:
             except Exception as e:
                 self.logger.error(f"[{thread_name}] 텍스트 추출 오류 ({url}): {e}")
                 merged_text = ""
+
+            # merged_text가 비어있으면 저장하지 않음
+            if not merged_text.strip():
+                self.logger.info(f"[{thread_name}] 빈 merged_text로 인해 저장을 건너뜁니다: {url}")
+                continue
+
+            # merged_text 정규화
+            normalized_text = self.normalize_text(merged_text)
+
+            # 정규화된 텍스트가 비어있으면 저장하지 않음
+            if not normalized_text:
+                self.logger.info(f"[{thread_name}] 정규화 후 빈 텍스트로 인해 저장을 건너뜁니다: {url}")
+                continue
+
+            # merged_text의 해시값 생성 (SHA-256 사용)
+            text_hash = hashlib.sha256(normalized_text.encode('utf-8')).hexdigest()
+
+            # 중복 체크
+            with self.seen_texts_lock:
+                if text_hash in self.seen_texts:
+                    self.logger.info(f"[{thread_name}] 중복된 merged_text를 발견하여 저장을 건너뜁니다: {url}")
+                    continue  # 중복되면 저장하지 않고 건너뜀
+                self.seen_texts.add(text_hash)  # 중복되지 않으면 해시값을 추가
 
             soup = BeautifulSoup(content, 'html.parser')
 
@@ -276,7 +328,8 @@ class Crawler:
                 self.fetch_queue, 
                 parse_queue_copy,  # 복사본 사용
                 self.visited, 
-                self.parsed_set
+                self.parsed_set,
+                self.seen_texts  # 추가
             )
             self.logger.info(f"[{thread_name}] 상태 저장 완료.")
             # 파일 크기 확인 및 로테이션
@@ -287,9 +340,11 @@ class Crawler:
             self.fetch_queue, 
             parse_queue_copy,  # 복사본 사용
             self.visited, 
-            self.parsed_set
+            self.parsed_set,
+            self.seen_texts  # 추가
         )
         self.logger.info(f"[{thread_name}] 최종 상태 저장 완료.")
+
 
     def run(self):
         # 시작 URL을 큐에 추가
@@ -307,16 +362,24 @@ class Crawler:
         # 링크 파일에서 추가 링크를 로드
         self.load_additional_links('links.jsonl')
 
+        # 크롤링 완료를 판단하기 위한 타이머 설정
+        idle_time = 0
+        idle_threshold = 20  # 크롤링이 idle 상태로 20초 이상 유지되면 종료
+
         try:
             while not self.stop_crawling_event.is_set():
                 # 작업 진행 중인지 확인
                 with self.fetch_queue_lock, self.parse_queue_lock:
                     if not self.fetch_queue and not self.parse_queue:
-                        # 모든 스레드가 대기 중인지 확인
-                        all_fetch_threads_idle = all(not t.is_alive() for t in self.fetch_threads_list)
-                        all_parse_threads_idle = all(not t.is_alive() for t in self.parse_threads_list)
-                        if all_fetch_threads_idle and all_parse_threads_idle:
+                        idle_time += 1
+                        self.logger.debug(f"Idle time 증가: {idle_time}/{idle_threshold}")
+                        if idle_time >= idle_threshold:
+                            self.logger.info("큐가 비어있고 일정 시간 동안 추가 작업이 없어 크롤링을 종료합니다.")
+                            self.stop_crawling_event.set()
                             break
+                    else:
+                        idle_time = 0  # 큐에 작업이 있으면 idle_time 초기화
+                        self.logger.debug("큐에 작업이 존재하여 idle_time 초기화.")
                 time.sleep(1)
         except KeyboardInterrupt:
             self.logger.info("사용자에 의해 크롤링이 중단되었습니다.")
@@ -335,9 +398,7 @@ class Crawler:
             # 남아있는 데이터를 최종 저장
             self.saver.final_save()
 
-            # 상태 저장
-            self.state_manager.save_state(self.fetch_queue, self.parse_queue, self.visited, self.parsed_set)
+            # 상태 저장 (seen_texts 포함)
+            self.state_manager.save_state(self.fetch_queue, self.parse_queue, self.visited, self.parsed_set, self.seen_texts)
 
             self.logger.info("크롤링 및 파싱 작업이 종료되었습니다.")
-
-
