@@ -8,7 +8,7 @@ from crawler import Crawler
 
 # 로깅 설정
 logger = logging.getLogger('CrawlerLogger')
-logger.setLevel(logging.INFO)  # DEBUG 레벨로 설정하여 추가 로그 확인
+logger.setLevel(logging.INFO)  # DEBUG INFO 레벨로 설정하여 추가 로그 확인
 
 # RotatingFileHandler 설정 (5MB마다 로그 파일을 교체, 최대 5개 파일 유지, UTF-8 인코딩)
 log_dir = 'log'

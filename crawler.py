@@ -5,7 +5,6 @@ import os
 import json
 from collections import deque
 from urllib.parse import urlparse, urljoin, parse_qs
-import logging
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -15,7 +14,7 @@ from fetcher import Fetcher
 from parser import Parser
 from saver import Saver
 from state_manager import StateManager
-
+import logging
 
 from utils import normalize_url, load_jsonl, extract_unique_identifier
 
@@ -96,6 +95,7 @@ class Crawler:
         # 제외할 정확한 URL 정의
         self.excluded_urls = [
             'https://www.yonsei.ac.kr/sc/support/notice.jsp',
+            'https://yonsei.ac.kr/sc/support/notice.jsp',
             'https://yicrc.yonsei.ac.kr/news.asp',
             'https://yicrc.yonsei.ac.kr/program.asp',
             'https://yicrc.yonsei.ac.kr/newsletter.asp',
@@ -109,15 +109,18 @@ class Crawler:
             'https://library.yonsei.ac.kr/en',
             'https://library.yonsei.ac.kr/SSOLegacy.do',
             'https://library.yonsei.ac.kr/login',
-            'https://www.yonsei.ac.kr/sc/intro/promotionvideo.jsp',
-            'https://www.yonsei.ac.kr/sc/intro/promotionvideo-for-sns.jsp',
-            'https://www.yonsei.ac.kr/sc/intro/pressrel.jsp',
-            'https://www.yonsei.ac.kr/sc/intro/media1.jsp',
+            'https://yonsei.ac.kr/sc/intro/promotionvideo.jsp',
+            'https://yonsei.ac.kr/sc/intro/promotionvideo-for-sns.jsp',
+            'https://yonsei.ac.kr/sc/intro/pressrel.jsp',
+            'https://yonsei.ac.kr/sc/intro/media1.jsp',
             'https://oia.yonsei.ac.kr/intro/photo.asp',
             'https://oia.yonsei.ac.kr/upload_file/',
             'https://yicrc.yonsei.ac.kr/main/downloadfile.asp?',
-            'https://www.yonsei.ac.kr/sc/support/scholarship.jsp',
-            'https://www.yonsei.ac.kr/sc/support/lost_found.jsp'
+            'https://yonsei.ac.kr/sc/support/scholarship.jsp',
+            'https://yonsei.ac.kr/sc/support/lost_found.jsp',
+            'https://yonsei.ac.kr/sc/campus/yonseibean.jsp',
+            'https://yonsei.ac.kr/sc/intro/sympathy.jsp',
+            'https://yicdorm.yonsei.ac.kr/downloadfile.asp'
 
         ]
 
@@ -147,11 +150,18 @@ class Crawler:
 
     def add_url_to_queue(self, url, depth):
         normalized_url = normalize_url(url)
+        
+        # URL이 절대 경로인지 확인
+        parsed_url = urlparse(normalized_url)
+        if not parsed_url.scheme or not parsed_url.netloc:
+            self.logger.warning(f"절대 경로가 아닌 URL을 건너뜁니다: {normalized_url}")
+            return  # 절대 경로가 아니면 추가하지 않음
+        
         unique_id = extract_unique_identifier(normalized_url)
         
         with self.visited_identifiers_lock:
             if unique_id in self.visited_identifiers:
-                self.logger.debug(f"이미 방문한 콘텐츠입니다: {unique_id}")
+                self.logger.debug(f"제외하거나 처리된 콘텐츠입니다: {unique_id}")
                 return  # 이미 처리된 콘텐츠이므로 추가하지 않음
             else:
                 self.visited_identifiers.add(unique_id)
@@ -182,6 +192,7 @@ class Crawler:
                                 f_links.write('\n')
                         except Exception as e:
                             self.logger.error(f"links.jsonl에 URL 저장 실패: {e}")
+
 
     def load_additional_links(self, links_file):
         """links.jsonl에서 URL을 큐에 추가"""
@@ -383,7 +394,7 @@ class Crawler:
 
         # 크롤링 완료를 판단하기 위한 타이머 설정
         idle_time = 0
-        idle_threshold = 20  # 크롤링이 idle 상태로 20초 이상 유지되면 종료
+        idle_threshold = 120  # 크롤링이 idle 상태로 120초 이상 유지되면 종료
 
         try:
             while not self.stop_crawling_event.is_set():
@@ -391,7 +402,6 @@ class Crawler:
                 with self.fetch_queue_lock, self.parse_queue_lock:
                     if not self.fetch_queue and not self.parse_queue:
                         idle_time += 1
-                        self.logger.debug(f"Idle time 증가: {idle_time}/{idle_threshold}")
                         if idle_time >= idle_threshold:
                             self.logger.info("큐가 비어있고 일정 시간 동안 추가 작업이 없어 크롤링을 종료합니다.")
                             self.stop_crawling_event.set()

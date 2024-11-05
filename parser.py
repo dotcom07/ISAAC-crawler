@@ -134,23 +134,32 @@ class Parser:
         return tables
 
     def extract_links(self, page_content, base_url):
+        # base_url에 'www.'가 없으면 추가
+        parsed_base = urlparse(base_url)
+        if not parsed_base.netloc.startswith('www.'):
+            base_url = f"{parsed_base.scheme}://www.{parsed_base.netloc}{parsed_base.path}"
+            self.logger.debug(f"변경된 base_url: {base_url}")
+
         soup = BeautifulSoup(page_content, 'html.parser')
         links = []
         for link in soup.find_all('a', href=True):
             href = link['href']
+            self.logger.debug(f"추출된 href: {href}")
             if href.startswith('mailto:') or href.startswith('javascript:'):
                 continue
-            if 'download.jsp' in href.lower():  # 'download.jsp' 링크는 파일로만 처리
+            if 'download.jsp' in href.lower():
                 continue
-            # 공백 또는 기타 구분자로 여러 URL이 포함될 수 있으므로 분리
             hrefs = re.split(r'\s+', href)
             for href_part in hrefs:
                 full_url = urljoin(base_url, href_part)
+                self.logger.debug(f"변환된 링크: {full_url}")  # 모든 full_url을 출력
                 parsed = urlparse(full_url)
                 if parsed.scheme in ['http', 'https']:
                     if self.is_within_base_domain(parsed.netloc):
                         links.append(full_url)
         return links
+
+
 
     def is_within_base_domain(self, netloc):
         netloc = netloc.lower()

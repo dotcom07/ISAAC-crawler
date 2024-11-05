@@ -3,6 +3,7 @@
 import os
 import json
 from urllib.parse import urlparse, urlunparse, parse_qsl
+import logging
 
 def load_jsonl(file_path):
     if not os.path.exists(file_path):
@@ -46,7 +47,7 @@ def normalize_url(url):
     
     # 정규화된 URL 재구성
     normalized = urlunparse((scheme, netloc, path, parsed.params, query, fragment))
-    
+    logging.debug(f"normalize_url - 입력: {url}, 출력: {normalized}")
     return normalized
 
 
