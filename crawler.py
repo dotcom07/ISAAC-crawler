@@ -104,6 +104,7 @@ class Crawler:
             'https://yicdorm.yonsei.ac.kr/board.asp?mid=m05_05',
             'https://yicdorm.yonsei.ac.kr/board.asp?mid=m05_03',
             'https://yicdorm.yonsei.ac.kr/board.asp?mid=m05_04',
+            'https://yicdorm.yonsei.ac.kr/board.asp?mid=m05_07',
             'https://dorm.yonsei.ac.kr/en',
             'https://computing.yonsei.ac.kr/eng',
             'https://library.yonsei.ac.kr/en',
