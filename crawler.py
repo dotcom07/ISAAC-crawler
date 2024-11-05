@@ -122,12 +122,11 @@ class Crawler:
             'https://yonsei.ac.kr/sc/campus/yonseibean.jsp',
             'https://yonsei.ac.kr/sc/intro/sympathy.jsp',
             'https://yicdorm.yonsei.ac.kr/downloadfile.asp',
-            'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=2'
-            'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=3'
-            'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=4'
-            'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=5'
+            'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=2',
+            'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=3',
+            'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=4',
+            'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=5',
             'https://yicdorm.yonsei.ac.kr/board.asp?act=view&bid=7'
-
         ]
 
 
