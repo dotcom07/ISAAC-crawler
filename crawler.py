@@ -15,7 +15,9 @@ from fetcher import Fetcher
 from parser import Parser
 from saver import Saver
 from state_manager import StateManager
-from utils import normalize_url, load_jsonl
+
+
+from utils import normalize_url, load_jsonl, extract_unique_identifier
 
 class Crawler:
     def __init__(self, start_url, max_depth, fetch_threads, parse_threads, save_interval, user_agents,
@@ -64,9 +66,13 @@ class Crawler:
 
         # 상태 로드 (seen_texts 포함)
         state = self.state_manager.load_state(self.start_url)
-        self.fetch_queue, self.parse_queue, self.visited, self.parsed_set, self.seen_texts = state
+        self.fetch_queue, self.parse_queue, self.visited, self.parsed_set, self.seen_texts, self.visited_identifiers = state
 
         self.stop_crawling_event = threading.Event()
+
+
+        self.visited_identifiers = set()
+        self.visited_identifiers_lock = threading.Lock()
 
         # 이미 제외된 URL을 저장하는 캐시 추가
         self.excluded_cache = set()
@@ -107,10 +113,12 @@ class Crawler:
             'https://www.yonsei.ac.kr/sc/intro/promotionvideo-for-sns.jsp',
             'https://www.yonsei.ac.kr/sc/intro/pressrel.jsp',
             'https://www.yonsei.ac.kr/sc/intro/media1.jsp',
-            'https://oia.yonsei.ac.kr/news/newsInt.asp?SFIELD=>XT=>XT=>XT=>XT',
-            'https://oia.yonsei.ac.kr/intstd/notice.asp?SFIELD=>XT=>XT=>XT=>XT',
-            'https://oia.yonsei.ac.kr/news/newsIMain.asp?SFIELD=>XT=>XT=>XT=>XT',
-            'https://oia.yonsei.ac.kr/intro/photo.asp'
+            'https://oia.yonsei.ac.kr/intro/photo.asp',
+            'https://oia.yonsei.ac.kr/upload_file/',
+            'https://yicrc.yonsei.ac.kr/main/downloadfile.asp?',
+            'https://www.yonsei.ac.kr/sc/support/scholarship.jsp',
+            'https://www.yonsei.ac.kr/sc/support/lost_found.jsp'
+
         ]
 
 
@@ -139,6 +147,15 @@ class Crawler:
 
     def add_url_to_queue(self, url, depth):
         normalized_url = normalize_url(url)
+        unique_id = extract_unique_identifier(normalized_url)
+        
+        with self.visited_identifiers_lock:
+            if unique_id in self.visited_identifiers:
+                self.logger.debug(f"이미 방문한 콘텐츠입니다: {unique_id}")
+                return  # 이미 처리된 콘텐츠이므로 추가하지 않음
+            else:
+                self.visited_identifiers.add(unique_id)
+        
         with self.visited_lock:
             if normalized_url not in self.visited and normalized_url not in self.parsed_set:
                 if self.max_depth is None or depth <= self.max_depth:
@@ -150,7 +167,7 @@ class Crawler:
                     # 중복이 아니면 fetch_queue에 추가
                     with self.fetch_queue_lock:
                         self.fetch_queue.append((normalized_url, depth))
-                        self.logger.debug(f"URL 큐에 추가됨: {normalized_url} (Depth: {depth})")  # 추가된 로그
+                        self.logger.debug(f"URL 큐에 추가됨: {normalized_url} (Depth: {depth})")
                     self.visited.add(normalized_url)
                     
                     # links.jsonl에 추가
@@ -329,7 +346,8 @@ class Crawler:
                 parse_queue_copy,  # 복사본 사용
                 self.visited, 
                 self.parsed_set,
-                self.seen_texts  # 추가
+                self.seen_texts,
+                self.visited_identifiers
             )
             self.logger.info(f"[{thread_name}] 상태 저장 완료.")
             # 파일 크기 확인 및 로테이션
@@ -341,7 +359,8 @@ class Crawler:
             parse_queue_copy,  # 복사본 사용
             self.visited, 
             self.parsed_set,
-            self.seen_texts  # 추가
+            self.seen_texts,
+            self.visited_identifiers
         )
         self.logger.info(f"[{thread_name}] 최종 상태 저장 완료.")
 
@@ -399,6 +418,6 @@ class Crawler:
             self.saver.final_save()
 
             # 상태 저장 (seen_texts 포함)
-            self.state_manager.save_state(self.fetch_queue, self.parse_queue, self.visited, self.parsed_set, self.seen_texts)
+            self.state_manager.save_state(self.fetch_queue, self.parse_queue, self.visited, self.parsed_set, self.seen_texts, self.visited_identifiers)
 
             self.logger.info("크롤링 및 파싱 작업이 종료되었습니다.")

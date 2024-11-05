@@ -12,7 +12,7 @@ class StateManager:
         self.logger = logger
         self.lock = threading.Lock()
 
-    def save_state(self, fetch_queue, parse_queue, visited, parsed_set, seen_texts):
+    def save_state(self, fetch_queue, parse_queue, visited, parsed_set, seen_texts, visited_identifiers):
         with self.lock:
             state = {
                 'fetching_queue': list(fetch_queue),
@@ -22,7 +22,8 @@ class StateManager:
                 ],
                 'visited': list(visited),
                 'parsed': list(parsed_set),
-                'seen_texts': list(seen_texts)  # seen_texts 추가
+                'seen_texts': list(seen_texts),
+                'visited_identifiers': list(visited_identifiers)  # visited_identifiers 추가
             }
             temp_state_file = self.state_file + '.tmp'
             try:
@@ -49,8 +50,9 @@ class StateManager:
                     ])
                     visited = set(state.get('visited', []))
                     parsed_set = set(state.get('parsed', []))
-                    seen_texts = set(state.get('seen_texts', []))  # seen_texts 로드
-                    self.logger.info(f"불러온 상태: {len(fetch_queue)}개의 URL이 Fetch 큐에, {len(parse_queue)}개의 페이지가 Parse 큐에 있습니다. 방문한 URL 수: {len(visited)}, 파싱된 URL 수: {len(parsed_set)}, seen_texts 수: {len(seen_texts)}.")
+                    seen_texts = set(state.get('seen_texts', []))
+                    visited_identifiers = set(state.get('visited_identifiers', []))  # visited_identifiers 로드
+                    self.logger.info(f"불러온 상태: {len(fetch_queue)}개의 URL이 Fetch 큐에, {len(parse_queue)}개의 페이지가 Parse 큐에 있습니다. 방문한 URL 수: {len(visited)}, 파싱된 URL 수: {len(parsed_set)}, seen_texts 수: {len(seen_texts)}, visited_identifiers 수: {len(visited_identifiers)}.")
             except json.JSONDecodeError:
                 self.logger.error("상태 파일이 손상되었습니다. 초기화합니다.")
                 fetch_queue = deque()
@@ -58,12 +60,14 @@ class StateManager:
                 visited = set()
                 parsed_set = set()
                 seen_texts = set()
+                visited_identifiers = set()
         else:
             fetch_queue = deque()
             parse_queue = deque()
             visited = set()
             parsed_set = set()
             seen_texts = set()
+            visited_identifiers = set()
             self.logger.info("새로운 크롤링 세션을 시작합니다.")
 
-        return fetch_queue, parse_queue, visited, parsed_set, seen_texts
+        return fetch_queue, parse_queue, visited, parsed_set, seen_texts, visited_identifiers

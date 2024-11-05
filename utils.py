@@ -10,6 +10,8 @@ def load_jsonl(file_path):
     with open(file_path, 'r', encoding='utf-8') as f:
         return [json.loads(line) for line in f if line.strip()]
 
+from urllib.parse import urlparse, urlunparse, parse_qsl
+
 def normalize_url(url):
     parsed = urlparse(url)
     
@@ -24,8 +26,20 @@ def normalize_url(url):
     # 경로의 끝 슬래시 제거
     path = parsed.path.rstrip('/')
     
+    # 쿼리 파라미터 파싱
+    query_params = parse_qsl(parsed.query)
+    
+    # 제거할 매개변수 목록 (필요에 따라 더 추가)
+    params_to_remove = ['ddx', 'hID', 'sdx', 'SFIELD', 'XT', 'lang']
+    
+    # 제거할 매개변수를 제외한 새로운 쿼리 파라미터 목록 생성
+    filtered_params = [(k, v) for k, v in query_params if k not in params_to_remove]
+    
     # 쿼리 파라미터 정렬
-    query = '&'.join(['{}={}'.format(k, v) for k, v in sorted(parse_qsl(parsed.query))])
+    filtered_params.sort()
+    
+    # 정규화된 쿼리 문자열 재구성
+    query = '&'.join(['{}={}'.format(k, v) for k, v in filtered_params])
     
     # 프래그먼트 제거 (빈 문자열로 설정)
     fragment = ''
@@ -34,3 +48,16 @@ def normalize_url(url):
     normalized = urlunparse((scheme, netloc, path, parsed.params, query, fragment))
     
     return normalized
+
+
+def extract_unique_identifier(url):
+    parsed = urlparse(url)
+    query_params = dict(parse_qsl(parsed.query))
+    
+    # 우선순위에 따라 고유 식별자를 추출
+    for key in ['bidx', 'article_no', 'idx']:
+        if key in query_params:
+            return f"{parsed.netloc}{parsed.path}?{key}={query_params[key]}"
+    
+    # 식별자가 없으면 URL 전체를 사용
+    return normalize_url(url)
