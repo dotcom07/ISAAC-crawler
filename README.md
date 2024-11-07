@@ -43,7 +43,7 @@
 아래 사이트는 로그인이나 실시간 추가 작업이 필요할 때 크롤링에 추가될 수 있습니다:
 
 - [연세대 도서관](https://library.yonsei.ac.kr/bbs/list/1) (로그인 필요)
-- [장학 공지사항](https://www.yonsei.ac.kr/sc/support/scholarship.jsp) (대부분 마감됨)
+- [장학금금 공지사항](https://www.yonsei.ac.kr/sc/support/scholarship.jsp) (현재 대부분 마감됨)
 - [기숙사 공지사항](https://yicdorm.yonsei.ac.kr/board.asp?mid=m05_07)
 
 ## 크롤링 상태 저장 및 재개
